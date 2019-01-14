@@ -8,25 +8,31 @@
 #include "vector"
 using namespace std;
 //define global msg
+struct Joint_status
+{
+    double pose [7];
+    ros::Time timestamp;
+};
 double angles [7];
 double cur_pos[7];
 //define functions
 void joint_stateCallback (const sensor_msgs::JointState& joint);
 void movetotarget(void);
 void recorddata(void);
-void replaypose(int);
+void replaypose(int, int, int);
 void cleardata(void);
 void cuff_1_callback (const intera_core_msgs::IODeviceStatus& button);
 int c;
-vector<vector<double> > g1;
+//vector<vector<double> > g1;
 int q = 0;
+int mode;
 int low_button_status [2] = {0,0};
 int up_button = 0;//record mode
 int low_button = 0;//record now
 //define ros publisher and subscriber on sawyer
-ros::Publisher joint_0_pub;
+ros::Publisher joint_0_pub, joint_1_pub, joint_2_pub, joint_3_pub, joint_4_pub, joint_5_pub, joint_6_pub;
 ros::Subscriber angle_0_sub, cuff_0_sub;
-ros::Time posetime;
+vector<Joint_status> PP1;
 
 void joint_stateCallback (const sensor_msgs::JointState& joint)
 {
@@ -44,41 +50,78 @@ void cuff_1_callback (const intera_core_msgs::IODeviceStatus& button)
 void movetotarget()
 {
     //Publish msg using array
-    intera_core_msgs::JointCommand msg;
-    msg.mode = 1;
-    msg.names.push_back("right_j0");
-    msg.names.push_back("right_j1");
-    msg.names.push_back("right_j2");
-    msg.names.push_back("right_j3");
-    msg.names.push_back("right_j4");
-    msg.names.push_back("right_j5");
-    msg.names.push_back("right_j6");
-    for (int i=0;i<7;i++)
-        msg.position.push_back(angles[i]);
-    joint_0_pub.publish(msg);
+    if (mode==2)
+    {
+        intera_core_msgs::JointCommand msg;
+        msg.mode = 1;
+        msg.names.push_back("right_j0");
+        msg.names.push_back("right_j1");
+        msg.names.push_back("right_j2");
+        msg.names.push_back("right_j3");
+        msg.names.push_back("right_j4");
+        msg.names.push_back("right_j5");
+        msg.names.push_back("right_j6");
+        for (int i=0;i<7;i++)
+            msg.position.push_back(angles[i]);
+        joint_0_pub.publish(msg);
+    }
+    if (mode==1)
+    {
+        std_msgs::Float64 msg;
+        msg.data = angles[0];
+        joint_0_pub.publish(msg);
+        msg.data = angles[1];
+        joint_1_pub.publish(msg);
+        msg.data = angles[2];
+        joint_2_pub.publish(msg);
+        msg.data = angles[3];
+        joint_3_pub.publish(msg);
+        msg.data = angles[4];
+        joint_4_pub.publish(msg);
+        msg.data = angles[5];
+        joint_5_pub.publish(msg);
+        msg.data = angles[6];
+        joint_6_pub.publish(msg);
+    }
 }
 void recorddata()
 {
-    for(int i=0;i<7;i++)
+    // for(int i=0;i<7;i++)
+    // {
+    //     g1.push_back(std::vector<double>());
+    //     g1[q].push_back(cur_pos[i]);
+    // }
+    PP1.push_back(Joint_status());
+    for (int i=0;i<7;i++)
     {
-        g1.push_back(std::vector<double>());
-        g1[q].push_back(cur_pos[i]);
+        PP1[q].pose[i] = cur_pos[i];
+        ros::Time posetime = ros::Time::now();
+        PP1[q].timestamp = posetime;
     }
-    ros::Time posetime ros::Time::now());
     q++;
 }
-void replaypose(int i)
-{
-    for (int j=0;j<7;j++)
+void replaypose(int i, int p, int n)
+{   //The released time interval should be 20 ms. Then the poses are published in (t[i+1]-t[i]) in sec/ 20 ms segments. 
+    if (i==0)
+    {   
+        for (int j=0;j<7;j++)
+        {
+            angles[j] = PP1[q].pose[j]+(PP1[i].pose[j]-PP1[q].pose[j])/n*(p+1);
+        }
+    }
+    else
     {
-        angles[j] = g1[i][j];
+        for (int j=0;j<7;j++)
+        {
+            angles[j] = PP1[i-1].pose[j]+(PP1[i].pose[j]-PP1[i-1].pose[j])/n*(p+1);
+        }
     }
     //ROS_INFO("%lf ", g1[i]);
 }
 void cleardata()
 {
-    g1.resize(1);
-    g1[1].resize(1);
+    PP1.resize(0);
+    q = 0;
 }
 bool reach()
 {
@@ -100,9 +143,26 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "Joint_pos");
     ros::NodeHandle n;
     ROS_INFO("System running");
-    joint_0_pub = n.advertise<intera_core_msgs::JointCommand>("/robot/limb/right/joint_command", 1000);
-    cuff_0_sub = n.subscribe("/io/robot/cuff/state",1000, cuff_1_callback);
-    angle_0_sub = n.subscribe("/robot/joint_states",1000, joint_stateCallback);
+    ROS_INFO("Choose mode: 1 for simulator, 2 for real robot");
+    scanf("%d",&mode);
+    if (mode==2)
+    {
+        joint_0_pub = n.advertise<intera_core_msgs::JointCommand>("/robot/limb/right/joint_command", 1000);
+        cuff_0_sub = n.subscribe("/io/robot/cuff/state",1000, cuff_1_callback);
+        angle_0_sub = n.subscribe("/robot/joint_states",1000, joint_stateCallback);
+    }
+    if (mode==1)
+    {
+        joint_0_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j0_controller/command", 1000);
+        joint_1_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j1_controller/command", 1000);
+        joint_2_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j2_controller/command", 1000);
+        joint_3_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j3_controller/command", 1000);
+        joint_4_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j4_controller/command", 1000);
+        joint_5_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j5_controller/command", 1000);
+        joint_6_pub = n.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j6_controller/command", 1000);
+        angle_0_sub = n.subscribe("/robot/joint_states",1000, joint_stateCallback);
+        cuff_0_sub = n.subscribe("/io/robot/cuff/state",1000, cuff_1_callback);
+    }
     //record poses
     ROS_INFO("short press upper button to enter record mode");
     while (ros::ok())
@@ -152,18 +212,33 @@ int main(int argc, char **argv)
         //                 break;}
             case 1: 
             {   
-                int k;
-                k = g1.size();
-                if (k>1)
+                if (q>0)
                 {
-                    for (int i=0;i<k/7;i++)
+                    //inital position give 2s to move with 20ms interval
+                    int i = 0;
+                    int nn = 100;
+                    for (p=0;p<100;p++)
                     {
-                        replaypose(i);
+                        replaypose(i,p,nn);
                         ros::Time start = ros::Time::now();
                         while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
                         {
                             movetotarget();
                             ros::spinOnce();
+                        }
+                    }
+                    for (int i=1;i<q;i++)
+                    {
+                        nn = int((PP1[i].timestamp-PP1[i-1].timestamp).toSec()/0.02);
+                        for (p=0;p<nn;p++)
+                        {
+                            replaypose(i,p,nn);
+                            ros::Time start = ros::Time::now();
+                            while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                            {
+                                movetotarget();
+                                ros::spinOnce();
+                            }
                         }
                     }
                 }
