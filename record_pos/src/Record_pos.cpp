@@ -32,12 +32,16 @@ int low_button = 0;//record now
 //define ros publisher and subscriber on sawyer
 ros::Publisher joint_0_pub, joint_1_pub, joint_2_pub, joint_3_pub, joint_4_pub, joint_5_pub, joint_6_pub;
 ros::Subscriber angle_0_sub, cuff_0_sub;
-vector<Joint_status> PP1;
+vector<struct Joint_status> PP1;
 
 void joint_stateCallback (const sensor_msgs::JointState& joint)
 {
     for (int i=0;i<7;i++)
+    {
         cur_pos[i] = joint.position[i+1];
+        // ROS_INFO("Current position are: %lf",cur_pos[i]);
+    }
+
 }
 void cuff_1_callback (const intera_core_msgs::IODeviceStatus& button)
 {
@@ -91,13 +95,21 @@ void recorddata()
     //     g1.push_back(std::vector<double>());
     //     g1[q].push_back(cur_pos[i]);
     // }
-    PP1.push_back(Joint_status());
-    for (int i=0;i<7;i++)
+    struct Joint_status t;
+    for(int i=0;i<7;i++)
     {
-        PP1[q].pose[i] = cur_pos[i];
-        ros::Time posetime = ros::Time::now();
-        PP1[q].timestamp = posetime;
+        t.pose[i] = cur_pos[i];
+        t.timestamp = ros::Time::now();
+        ROS_INFO("POS is %lf",t.pose[i]);
     }
+    PP1.push_back(t);
+    // PP1.push_back(Joint_status());
+    // for (int i=0;i<7;i++)
+    // {
+    //     PP1[q].pose[i] = cur_pos[i];
+    //     ros::Time posetime = ros::Time::now();
+    //     PP1[q].timestamp = posetime;
+    // }
     q++;
 }
 void replaypose(int i, int p, int n)
@@ -106,7 +118,7 @@ void replaypose(int i, int p, int n)
     {   
         for (int j=0;j<7;j++)
         {
-            angles[j] = PP1[q].pose[j]+(PP1[i].pose[j]-PP1[q].pose[j])/n*(p+1);
+            angles[j] = PP1[q-1].pose[j]+(PP1[i].pose[j]-PP1[q-1].pose[j])/n*(p+1);
         }
     }
     else
@@ -179,6 +191,7 @@ int main(int argc, char **argv)
                 {
                     recorddata();
                     ROS_INFO("pose recorded");
+                    ROS_INFO("POS is %lf, %lf ,%lf, %lf, %lf, %lf, %lf",PP1[q-1].pose[0],PP1[q-1].pose[1],PP1[q-1].pose[2],PP1[q-1].pose[3],PP1[q-1].pose[4],PP1[q-1].pose[5],PP1[q-1].pose[6]);
                 }
                 else if (low_button == 2)
                 {
