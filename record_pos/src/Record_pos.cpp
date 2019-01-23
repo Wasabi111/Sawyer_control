@@ -23,11 +23,11 @@ double cur_pos[7];
 void joint_stateCallback (const sensor_msgs::JointState& joint);
 void movetotarget(void);
 void recorddata(void);
-void replaypose(int, int, int);
+void replaypose(int, double, double);
 void cleardata(void);
 void cuff_1_callback (const intera_core_msgs::IODeviceStatus& button);
 void splinefit(int);
-void splinereplay(int, int, int);
+void splinereplay(int, double, int);
 int c;
 int q = 0;
 int mode;
@@ -35,7 +35,7 @@ int low_button_status [2] = {0,0};
 int up_button = 0;//record mode
 int low_button = 0;//record now
 //define ros publisher and subscriber on sawyer
-ros::Publisher joint_0_pub, joint_1_pub, joint_2_pub, joint_3_pub, joint_4_pub, joint_5_pub, joint_6_pub;
+ros::Publisher joint_0_pub, joint_1_pub, joint_2_pub, joint_3_pub, joint_4_pub, joint_5_pub, joint_6_pub, test_pub;
 ros::Subscriber angle_0_sub, cuff_0_sub; 
 //the vector to save poses
 vector<struct Joint_status> PP1;
@@ -76,6 +76,9 @@ void movetotarget()
         for (int i=0;i<7;i++)
             msg.position.push_back(angles[i]);
         joint_0_pub.publish(msg);
+        std_msgs::Float64 msg1;
+        msg1.data = angles[5];
+        test_pub.publish(msg1);
     }
     //Simulator mode but a a program to receive button signal.
     if (mode==1)
@@ -109,7 +112,7 @@ void recorddata()
     }
     PP1.push_back(t);
 }
-void replaypose(int i, int p, int n)
+void replaypose(int i, double t, double dt)
 {   
     //Replay pose with average speed. Will be good used with only two poses.
     //The released time interval should be 20 ms. Then the poses are published in (t[i+1]-t[i]) in sec/ 20 ms segments. 
@@ -117,25 +120,27 @@ void replaypose(int i, int p, int n)
     {   
         for (int j=0;j<7;j++)
         {
-            angles[j] = PP1.back().pose[j]+(PP1[i].pose[j]-PP1.back().pose[j])/n*p;
+            double tt =ros::Time::now().toSec() - t;
+            angles[j] = PP1.back().pose[j]+(PP1[i].pose[j]-PP1.back().pose[j])/dt*tt;
         }
     }
     else
     {
         for (int j=0;j<7;j++)
         {
-            angles[j] = PP1[i-1].pose[j]+(PP1[i].pose[j]-PP1[i-1].pose[j])/n*p;
+            double tt =ros::Time::now().toSec() - t;
+            angles[j] = PP1[i-1].pose[j]+(PP1[i].pose[j]-PP1[i-1].pose[j])/dt*tt;
         }
     }
 }
-void splinereplay(int i, int p, int n)
+void splinereplay(int i, double t, int n)
 {
-    double t;//time
     //We could choose time position control or acceleration fix 3758 row in Servo86.cpp by Chi-Ju
-    t = (PP1[i].timestamp).toSec()+p*0.02;
     for (int j=0;j<7;j++)
     {
-        angles[j] = coe[4*j][i]+coe[4*j+1][n-i-1]*t+coe[4*j+2][n-i]*t*t+coe[4*j+3][n-i-1]*t*t*t;
+        double tt = (ros::Time::now()).toSec() - t;
+        angles[j] = coe[4*j][i]+coe[4*j+1][n-i-1]*tt+coe[4*j+2][n-i]*tt*tt+coe[4*j+3][n-i-1]*tt*tt*tt;
+        //ROS_INFO("angles for joint %d is: %lf",j,angles[j]);
     }
 }
 void splinefit(int n)
@@ -232,11 +237,13 @@ int main(int argc, char **argv)
     int j;
     int p;
     int nn;
-    ros::init(argc, argv, "Joint_pos");
+    double time_interval;
+    ros::init(argc, argv, "Record_pos");
     ros::NodeHandle n;
     ROS_INFO("System running");
     ROS_INFO("Choose mode: 1 for simulator, 2 for real robot");
     scanf("%d",&mode);
+    test_pub = n.advertise<std_msgs::Float64>("Joint_test", 1000);
     if (mode==2)
     {
         joint_0_pub = n.advertise<intera_core_msgs::JointCommand>("/robot/limb/right/joint_command", 1000);
@@ -292,7 +299,7 @@ int main(int argc, char **argv)
     //replay poses
     while (ros::ok())
     {
-        ROS_INFO("Choose mode:  1 for replay the poses with average speed.  2 for replay the poses with cubic spline interpolation. 3 for clean all poses. 3 for exit the program.");
+        ROS_INFO("Choose mode:  1 for replay the poses with average speed.  2 for replay the poses with cubic spline interpolation. 3 for clean all poses. 4 for exit the program.");
         scanf("%d", &j);
         switch (j) 
         {
@@ -302,10 +309,11 @@ int main(int argc, char **argv)
                 {
                     //inital position give 2s to move with 20ms interval.
                     int i = 0;
-                    int nn = 100;
-                    for (p=1;p<=nn;p++)
+                    time_interval = 2;
+                    ros::Time begin = ros::Time::now();
+                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
                     {
-                        replaypose(i,p,nn);
+                        replaypose(0,double(begin.toSec()),time_interval);
                         ros::Time start = ros::Time::now();
                         while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
                         {
@@ -315,10 +323,11 @@ int main(int argc, char **argv)
                     }
                     for (int i=1;i<PP1.size();i++)
                     {
-                        nn = int((PP1[i].timestamp-PP1[i-1].timestamp).toSec()/0.02);
-                        for (p=0;p<nn;p++)
+                        time_interval = (PP1[i].timestamp-PP1[i-1].timestamp).toSec();
+                        ros::Time begin = ros::Time::now();
+                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
                         {
-                            replaypose(i,p,nn);
+                            replaypose(i,double(begin.toSec()),time_interval);
                             ros::Time start = ros::Time::now();
                             while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
                             {
@@ -337,11 +346,14 @@ int main(int argc, char **argv)
             case 2:
             {
                 //When only have 1 or 2 poses use average speed mode
-                if (PP1.size() == 1)
+                if (PP1.size()<=2)
                 {
-                    for (p=1;p<=nn;p++)
+                    int i = 0;
+                    time_interval = 2;
+                    ros::Time begin = ros::Time::now();
+                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
                     {
-                        replaypose(1,p,nn);
+                        replaypose(0,double(begin.toSec()),time_interval);
                         ros::Time start = ros::Time::now();
                         while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
                         {
@@ -349,40 +361,63 @@ int main(int argc, char **argv)
                             ros::spinOnce();
                         }
                     }
-                }
-                if (PP1.size() == 2)
-                {
-                    nn = int((PP1[2].timestamp-PP1[1].timestamp).toSec()/0.02);
-                    for (p=0;p<nn;p++)
+                    for (int i=1;i<PP1.size();i++)
                     {
-                        replaypose(2,p,nn);
-                        ros::Time start = ros::Time::now();
-                        while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                        time_interval = (PP1[i].timestamp-PP1[i-1].timestamp).toSec();
+                        ros::Time begin = ros::Time::now();
+                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
                         {
-                            movetotarget();
-                            ros::spinOnce();
+                            replaypose(i,double(begin.toSec()),time_interval);
+                            ros::Time start = ros::Time::now();
+                            while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                            {
+                                movetotarget();
+                                ros::spinOnce();
+                            }
                         }
-                    }    
+                    }
                 }
                 if (PP1.size() > 2)
                 {
                     //Get cubic spline coefficients first
+                    //a0 to an
                     splinefit(PP1.size()-1);
-                    for (int i=0;i<PP1.size();i++)
+                    time_interval = 2;
+                    ros::Time begin = ros::Time::now();
+                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
                     {
-                        nn = int((PP1[i+1].timestamp-PP1[i].timestamp).toSec()/0.02);
-                        for (p=0;p<nn;p++)
+                        replaypose(0,double(begin.toSec()),time_interval);
+                        ros::Time start = ros::Time::now();
+                        while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
                         {
-                            splinereplay(i,p,PP1.size());
+                            movetotarget();
+                            ros::spinOnce();
+                        }
+                    }
+                    for (int i=1;i<PP1.size();i++)
+                    {
+                        time_interval = (PP1[i].timestamp-PP1[i-1].timestamp).toSec();
+                        ROS_INFO("Time Interval is %lf",time_interval);
+                        ros::Time begin = ros::Time::now();
+                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                        {
+                            splinereplay(i-1,double(begin.toSec()),PP1.size()-1);
+                            ros::Time start = ros::Time::now();
+                             while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                             {
+                                 movetotarget();
+                                 ros::spinOnce();
+                             }
                         }
                     }
                 }
+                break;
             }
             case 3: {   cleardata();
                         break;}
             case 4: {   break;}
         }   
-        if (j==3) 
+        if (j==4) 
             break;
     }
     return 0;
