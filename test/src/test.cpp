@@ -2,11 +2,27 @@
 #include "vector"
 #include "ros/ros.h"
 #include "std_msgs/Float64.h"
+#include "sensor_msgs/JointState.h"
+
 
 using namespace std;
 
+void movetotarget(void);
+ros::Publisher joint_0_pub;
+double angles;
+
+void movetotarget()
+{
+    std_msgs::Float64 msg;
+    msg.data = angles;
+    joint_0_pub.publish(msg);
+}
+
 int main(int argc, char **argv)
 {
+    ros::init(argc, argv, "Record_pos");
+    ros::NodeHandle xx;
+    joint_0_pub = xx.advertise<std_msgs::Float64>("/robot/right_joint_position_controller/joints/right_j0_controller/command", 1000);
     //step 1
     ROS_INFO("ok");
     double t[4]={0,1,2,3};
@@ -76,13 +92,22 @@ int main(int argc, char **argv)
     ROS_INFO("c %lf, %lf",c[2],c[1]);
 
     ROS_INFO("d %lf, %lf",d[1],d[0]);
-    ROS_INFO("sizes %d, %d, %d, %d",a.size(),b.size(),c.size(),d.size());
+    //ROS_INFO("sizes %d, %d, %d, %d",a.size(),b.size(),c.size(),d.size());
     //Save all the coefficients
     //But remember a is a0-an b-d are bn-b0 cn-c0 dn-d0, in other words reversly
     // //clear vectors
+    int tt;
     for (int i=0;i<n;i++)
     {
+        int nn = 0;
         ROS_INFO("The coefficients are %lf, %lf, %lf, %lf",a[i],b[n-i-1],c[n-i],d[n-i-1]);
+        nn = int((t[i+1]-t[i])/0.03);
+        for (int p=0;p<nn;p++)
+        {
+            tt = p*0.03;
+            angles = a[i]+b[n-i+1]*tt+c[n-i]*tt*tt+d[n-i+1]*tt*tt*tt;
+            movetotarget();
+        }
     }
 
     ROS_INFO("ok");

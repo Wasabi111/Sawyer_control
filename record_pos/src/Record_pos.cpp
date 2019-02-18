@@ -219,17 +219,17 @@ void cleardata()
     PP1.clear();
     q = 0;
 }
-bool reach()
+bool reach(int i)
 {
-    for (int i=0;i<7;i++)
+    for (int j=0;j<7;j++)
     {
-        if (abs(angles[i]-cur_pos[i])>0.01)
+        if (abs(PP1[i].pose[j]-cur_pos[j])>0.01)
         {
-            ROS_INFO("Joint %d still have %lf to asked position", i, abs(angles[i]-cur_pos[i]));
+            //ROS_INFO("Joint %d still have %lf to asked position", i, abs(angles[i]-cur_pos[i]));
             return false;
         }
     }
-    ROS_INFO("Reach!");
+    //ROS_INFO("Reach!");
     return true;
 }
 int main(int argc, char **argv)
@@ -278,7 +278,7 @@ int main(int argc, char **argv)
                 {
                     recorddata();
                     ROS_INFO("pose recorded");
-                    ROS_INFO("POS is %lf, %lf ,%lf, %lf, %lf, %lf, %lf",PP1.back().pose[0],PP1.back().pose[1],PP1.back().pose[2],PP1.back().pose[3],PP1.back().pose[4],PP1.back().pose[5],PP1.back().pose[6]);
+                    //ROS_INFO("POS is %lf, %lf ,%lf, %lf, %lf, %lf, %lf",PP1.back().pose[0],PP1.back().pose[1],PP1.back().pose[2],PP1.back().pose[3],PP1.back().pose[4],PP1.back().pose[5],PP1.back().pose[6]);
                 }
                 else if (low_button == 2)
                 {
@@ -311,29 +311,29 @@ int main(int argc, char **argv)
                     int i = 0;
                     time_interval = 2;
                     ros::Time begin = ros::Time::now();
-                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval && !reach(0))
                     {
                         replaypose(0,double(begin.toSec()),time_interval);
                         ros::Time start = ros::Time::now();
-                        while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
-                        {
+                        //while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                        //{
                             movetotarget();
                             ros::spinOnce();
-                        }
+                        //}
                     }
                     for (int i=1;i<PP1.size();i++)
                     {
                         time_interval = (PP1[i].timestamp-PP1[i-1].timestamp).toSec();
                         ros::Time begin = ros::Time::now();
-                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval && !reach(i))
                         {
                             replaypose(i,double(begin.toSec()),time_interval);
                             ros::Time start = ros::Time::now();
-                            while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
-                            {
-                                movetotarget();
-                                ros::spinOnce();
-                            }
+                            //while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                            //{
+                            movetotarget();
+                            ros::spinOnce();
+                            //}
                         }
                     }
                 }
@@ -351,29 +351,29 @@ int main(int argc, char **argv)
                     int i = 0;
                     time_interval = 2;
                     ros::Time begin = ros::Time::now();
-                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval && !reach(0))
                     {
                         replaypose(0,double(begin.toSec()),time_interval);
                         ros::Time start = ros::Time::now();
-                        while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
-                        {
-                            movetotarget();
-                            ros::spinOnce();
-                        }
+                        //while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                        //{
+                        movetotarget();
+                        ros::spinOnce();
+                        //}
                     }
                     for (int i=1;i<PP1.size();i++)
                     {
                         time_interval = (PP1[i].timestamp-PP1[i-1].timestamp).toSec();
                         ros::Time begin = ros::Time::now();
-                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval && !reach(i))
                         {
                             replaypose(i,double(begin.toSec()),time_interval);
                             ros::Time start = ros::Time::now();
-                            while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
-                            {
-                                movetotarget();
-                                ros::spinOnce();
-                            }
+                            //while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                            //{
+                            movetotarget();
+                            ros::spinOnce();
+                            //}
                         }
                     }
                 }
@@ -384,30 +384,33 @@ int main(int argc, char **argv)
                     splinefit(PP1.size()-1);
                     time_interval = 2;
                     ros::Time begin = ros::Time::now();
-                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                    while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval && !reach(0))
                     {
                         replaypose(0,double(begin.toSec()),time_interval);
                         ros::Time start = ros::Time::now();
-                        while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
-                        {
-                            movetotarget();
-                            ros::spinOnce();
-                        }
+                        //while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                        //{
+                        movetotarget();
+                        ros::spinOnce();
+                        //}
                     }
                     for (int i=1;i<PP1.size();i++)
                     {
                         time_interval = (PP1[i].timestamp-PP1[i-1].timestamp).toSec();
-                        ROS_INFO("Time Interval is %lf",time_interval);
+                        //ROS_INFO("Time Interval is %lf",time_interval);
                         ros::Time begin = ros::Time::now();
-                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval)
+                        double start = begin.toSec();
+                        int size = PP1.size()-1;
+                        int index = i-1;
+                        while (ros::ok() && (ros::Time::now() - begin).toSec() <= time_interval && !reach(i))
                         {
-                            splinereplay(i-1,double(begin.toSec()),PP1.size()-1);
-                            ros::Time start = ros::Time::now();
-                             while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
-                             {
-                                 movetotarget();
-                                 ros::spinOnce();
-                             }
+                            splinereplay(index, start, size);
+                            //ros::Time start = ros::Time::now();
+                             //while(ros::ok() && !reach() && (ros::Time::now() - start).toSec() < 5)
+                             //{
+                            movetotarget();
+                            ros::spinOnce();
+                             //}
                         }
                     }
                 }
