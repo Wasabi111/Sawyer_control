@@ -24,6 +24,11 @@ install(PROGRAMS
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+install(PROGRAMS
+   scripts/classification_pick_and_place_demo.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 foreach(dir launch models)
    install(DIRECTORY ${dir}/
       DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir})
