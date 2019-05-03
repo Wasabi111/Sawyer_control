@@ -6,6 +6,7 @@
 ### Results?
 ## Simulator examples
  Fix the issue that this would overwrite Gazebo simulator example folder.
- The way to launch it: easily by typing "roslaunch sawyer_sim_examples sawyer_pick_and_place_demo.launch" in your workspace after sourcing your files.
+ The way to launch it: easily by typing "roslaunch classification_examples classification_pick_and_place_demo.launch
+" in your workspace after sourcing your files.
 
 ![](Sawyer_simulator.png)
